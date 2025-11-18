@@ -42,23 +42,24 @@
       const results = document.getElementById('results');
       results.innerHTML = '<div class="loading">Loading profile and videos...</div>';
       try {
-        // 2025 proxy for raw HTML
+        // Proxy for raw HTML (from Apify/Scrapfly guides)
         const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://www.tiktok.com/@${username}`);
         const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error('Network error - try again');
         const html = await response.text();
 
-        // 2025 regex for script tag (from Scrapfly/Decodo guides)
-        let jsonMatch = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">({.*?})<\/script>/s);
+        // 2025 regex for script tag (from Decodo/Scrapfly)
+        let jsonMatch = html.match(/<script id="__SIGI_STATE__" type="application\/json">({.*?})<\/script>/s);
         if (!jsonMatch) jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});/s);
+        if (!jsonMatch) jsonMatch = html.match(/window\.__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*({.*?});/s);
         if (!jsonMatch) throw new Error('Profile data not found (private or invalid user)');
 
         const data = JSON.parse(jsonMatch[1]);
 
-        // 2025 path (from HasData/DEV Community)
-        const userDetail = data.__DEFAULT_SCOPE__?.['webapp.user-detail'] || {};
-        const user = userDetail.userInfo?.user || {};
-        const posts = userDetail['user-post']?.itemList || [];
+        // 2025 path with fallbacks (from Aimultiple/Apify)
+        const userDetail = data.__DEFAULT_SCOPE__?.webapp?.['user-detail'] || data.UserModule?.data || {};
+        const user = userDetail.userInfo?.user || userDetail.user || {};
+        const posts = userDetail['user-post']?.itemList || data.UserModule?.data?.videos || data.__DEFAULT_SCOPE__?.webapp?.['user-post']?.itemList || [];
 
         if (posts.length === 0) {
           results.innerHTML = '<div class="error">No public videos found or profile is private. Try another username.</div>';
@@ -69,15 +70,15 @@
         let output = `<div class="profile-header">
           <h2>${user.nickname || username} (@${username})</h2>
           <p>Followers: ${(user.followerCount || 0).toLocaleString()} | Likes: ${(user.heart || user.totalFavorited || 0).toLocaleString()} | Videos: ${posts.length}</p>
-          <p style="color: #666; font-style: italic;">Bio: ${user.signature || 'No bio available'}</p>
+          <p style="color: #666; font-style: italic;">Bio: ${user.signature || user.bio || 'No bio available'}</p>
         </div>`;
 
         // Video grid (first 12)
         posts.slice(0, 12).forEach(post => {
-          const video = post.video || {};
+          const video = post.video || post.itemInfo?.itemStruct?.video || {};
           const playUrl = video.playAddr?.[0] || video.downloadAddr?.[0] || '';
-          const cover = video.cover?.[0] || '';
-          const desc = (post.desc || 'No description').slice(0, 100);
+          const cover = video.cover?.[0] || video.dynamicCover?.[0] || '';
+          const desc = (post.desc || post.text || 'No description').slice(0, 100);
           const downloadUrl = playUrl.replace(/playwm/gi, 'play');
 
           if (playUrl) {
@@ -85,7 +86,7 @@
               <video controls preload="metadata" poster="${cover}">
                 <source src="${playUrl}" type="video/mp4">
               </video>
-              <p class="desc">${desc}</p>
+              <p class="desc">${desc}${ (post.desc || post.text || '').length > 100 ? '...' : '' }</p>
               <a href="${downloadUrl}" download class="download">Download HD (No Watermark)</a>
             </div>`;
           }
