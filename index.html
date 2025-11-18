@@ -3,104 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anonymous TikTok Viewer 2025 - No Login Needed</title>
-  <meta name="description" content="View TikTok profiles and videos anonymously without an account or app. Free, private browsing.">
+  <title>Anonymous TikTok Viewer 2025</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-    h1 { text-align: center; color: #ff0050; }
-    #input-container { text-align: center; margin: 30px 0; }
-    input { padding: 12px; width: 280px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-    button { padding: 12px 24px; background: #ff0050; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-left: 10px; }
-    button:hover { background: #e60046; }
-    #results { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 30px; }
-    .video-item { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
-    video { width: 100%; border-radius: 8px; }
-    .desc { margin: 10px 0; font-size: 14px; color: #444; }
-    .download { display: inline-block; margin-top: 8px; color: #ff0050; font-weight: bold; text-decoration: none; }
-    .download:hover { text-decoration: underline; }
-    .loading, .error { text-align: center; padding: 40px; font-size: 18px; }
-    .error { color: #d00; }
-    .profile-header { grid-column: 1 / -1; text-align: center; background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    body{font-family:Arial;max-width:900px;margin:40px auto;background:#f9f9f9;padding:20px;}
+    h1{color:#ff0050;text-align:center;}
+    input,button{padding:15px;font-size:18px;border-radius:8px;border:none;margin:10px;}
+    input{width:300px;}
+    button{background:#ff0050;color:white;cursor:pointer;}
+    #videos{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:40px;}
+    video{width:100%;border-radius:12px;}
+    .download{margin-top:10px;color:#ff0050;font-weight:bold;}
   </style>
 </head>
 <body>
   <h1>Anonymous TikTok Viewer</h1>
-  <p style="text-align: center; color: #666;">Enter a username (e.g., khaby.lame) to view profile and videos privately—no login, no trace.</p>
-  <div id="input-container">
-    <input type="text" id="username" placeholder="username (without @)" autofocus />
-    <button onclick="loadProfile()">Load Profile</button>
+  <p style="text-align:center;color:#666;">Enter any username — no login required.</p>
+  <div style="text-align:center;">
+    <input type="text" id="user" placeholder="e.g. khaby.lame" autofocus>
+    <button onclick="go()">Load Videos</button>
   </div>
-  <div id="results"></div>
+  <div id="videos"></div>
 
   <script>
-    async function loadProfile() {
-      const username = document.getElementById('username').value.trim().replace('@', '');
-      if (!username) {
-        alert('Enter a username!');
+    async function go() {
+      const username = document.getElementById('user').value.trim().replace('@','');
+      if (!username) return alert('Enter a username');
+      document.getElementById('videos').innerHTML = '<p>Loading...</p>';
+
+      // This API still works in Nov 2025 (free tier)
+      const res = await fetch(`https://api.tikwm.com/api/user/posts?unique_id=${username}&count=30`);
+      const json = await res.json();
+
+      if (json.code !== 0 || !json.data.videos) {
+        document.getElementById('videos').innerHTML = '<p style="color:red;text-align:center;">No videos found or account is private.</p>';
         return;
       }
-      const results = document.getElementById('results');
-      results.innerHTML = '<div class="loading">Loading profile and videos...</div>';
-      try {
-        // Proxy for raw HTML
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://www.tiktok.com/@${username}`);
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error('Network error - try again');
-        const html = await response.text();
-        console.log('HTML fetched, length:', html.length); // Debug: Check if HTML is empty
 
-        // Updated regex for 2025 (script tag, from Scrapfly guides)
-        let jsonMatch = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">({[\s\S]*?})<\/script>/s);
-        if (!jsonMatch) jsonMatch = html.match(/<script id="__SIGI_STATE__" type="application\/json">({[\s\S]*?})<\/script>/s);
-        if (!jsonMatch) jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({[\s\S]*?});/s);
-        if (!jsonMatch) throw new Error('Profile data not found (private or invalid user) - check console for HTML length');
-        console.log('JSON matched, length:', jsonMatch[1].length); // Debug: Check if JSON is empty
+      let html = '';
+      json.data.videos.forEach(v => {
+        const play = v.play;
+        const cover = v.cover;
+        const desc = v.title || 'No caption';
+        const nowm = play.replace('playwm', 'play'); // no watermark
 
-        const data = JSON.parse(jsonMatch[1]);
+        html += `
+          <div>
+            <video controls poster="${cover}"><source src="${play}" type="video/mp4"></video>
+            <p>${desc.slice(0,80)}${desc.length>80?'...':''}</p>
+            <a href="${nowm}" download class="download">Download No Watermark</a>
+          </div>`;
+      });
 
-        // Fallback paths for 2025 structure
-        const userDetail = data.__DEFAULT_SCOPE__?.webapp?.['user-detail'] || data.UserModule?.data || {};
-        const user = userDetail.userInfo?.user || userDetail.user || {};
-        const posts = userDetail['user-post']?.itemList || data.UserModule?.data?.videos || data.__DEFAULT_SCOPE__?.webapp?.['user-post']?.itemList || [];
-
-        if (posts.length === 0) {
-          results.innerHTML = '<div class="error">No public videos found or profile is private. Try another username.</div>';
-          return;
-        }
-
-        // Profile header
-        let output = `<div class="profile-header">
-          <h2>${user.nickname || username} (@${username})</h2>
-          <p>Followers: ${(user.followerCount || 0).toLocaleString()} | Likes: ${(user.heart || user.totalFavorited || 0).toLocaleString()} | Videos: ${posts.length}</p>
-          <p style="color: #666; font-style: italic;">Bio: ${user.signature || user.bio || 'No bio available'}</p>
-        </div>`;
-
-        // Video grid (first 12)
-        posts.slice(0, 12).forEach(post => {
-          const video = post.video || post.itemInfo?.itemStruct?.video || {};
-          const playUrl = video.playAddr?.[0] || video.downloadAddr?.[0] || '';
-          const cover = video.cover?.[0] || video.dynamicCover?.[0] || '';
-          const desc = (post.desc || post.text || 'No description').slice(0, 100);
-          const downloadUrl = playUrl.replace(/playwm/gi, 'play');
-
-          if (playUrl) {
-            output += `<div class="video-item">
-              <video controls preload="metadata" poster="${cover}">
-                <source src="${playUrl}" type="video/mp4">
-              </video>
-              <p class="desc">${desc}${ (post.desc || post.text || '').length > 100 ? '...' : '' }</p>
-              <a href="${downloadUrl}" download class="download">Download HD (No Watermark)</a>
-            </div>`;
-          }
-        });
-
-        results.innerHTML = output;
-        console.log('Success - loaded', posts.length, 'videos'); // Debug: Confirm success
-
-      } catch (error) {
-        console.error('Full error:', error); // Debug: See exact error in console
-        results.innerHTML = `<div class="error">Error loading profile: ${error.message}<br><br>Check console (F12) for details. Try a VPN if it persists.</div>`;
-      }
+      document.getElementById('videos').innerHTML = html;
     }
   </script>
 </body>
