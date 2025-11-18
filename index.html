@@ -4,28 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anonymous TikTok Viewer 2025 - No Login Needed</title>
-  <meta name="description" content="View TikTok profiles and videos anonymously without an account or app.">
+  <meta name="description" content="View TikTok profiles and videos anonymously without an account or app. Free, private browsing.">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #001133; color: #fff; } /* DARK BLUE BG */
-    h1 { text-align: center; color: #ff5500; } /* BRIGHT ORANGE TITLE */
-    #input-container { text-align: center; margin: 40px 0; }
-    input { padding: 14px; width: 300px; border: 3px solid yellow; border-radius: 10px; font-size: 18px; background:#112; color:white; }
-    button { padding: 14px 30px; background: limegreen; color: black; border: none; border-radius: 10px; cursor: pointer; font-size: 18px; font-weight: bold; margin-left: 12px; }
-    button:hover { background: #00ff00; }
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    h1 { text-align: center; color: #ff0060; }
+    #input-container { text-align: center; margin: 30px 0; }
+    input { padding: 12px; width: 280px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    button { padding: 12px 24px; background: #ff0050; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin-left: 10px; }
+    button:hover { background: #e60046; }
     #results { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 30px; }
-    .video-item { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; text-align: center; }
+    .video-item { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
     video { width: 100%; border-radius: 8px; }
-    .desc { margin: 10px 0; font-size: 14px; }
-    .download { color: cyan; font-weight: bold; }
-    .error { color: #ff4466; text-align: center; padding: 40px; font-size: 20px; }
-    .profile-header { grid-column: 1/-1; background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; }
+    .desc { margin: 10px 0; font-size: 14px; color: #444; }
+    .download { display: inline-block; margin-top: 8px; color: #ff0050; font-weight: bold; text-decoration: none; }
+    .download:hover { text-decoration: underline; }
+    .loading, .error { text-align: center; padding: 40px; font-size: 18px; }
+    .error { color: #d00; }
+    .profile-header { grid-column: 1 / -1; text-align: center; background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
   </style>
 </head>
 <body>
   <h1>Anonymous TikTok Viewer</h1>
-  <p style="text-align:center;">Enter a username (e.g. khaby.lame) — no login, no trace.</p>
+  <p style="text-align: center; color: #666;">Enter a username (e.g., khaby.lame) to view profile and videos privately—no login, no trace.</p>
   <div id="input-container">
-    <input type="text" id="username" placeholder="username (no @)" autofocus />
+    <input type="text" id="username" placeholder="username (without @)" autofocus />
     <button onclick="loadProfile()">Load Profile</button>
   </div>
   <div id="results"></div>
@@ -33,51 +35,67 @@
   <script>
     async function loadProfile() {
       const username = document.getElementById('username').value.trim().replace('@', '');
-      if (!username) return alert('Enter a username!');
+      if (!username) {
+        alert('Enter a username!');
+        return;
+      }
       const results = document.getElementById('results');
-      results.innerHTML = '<div class="error">Loading...</div>';
-
+      results.innerHTML = '<div class="loading">Loading profile and videos...</div>';
       try {
+        // 2025 proxy (bypasses blocks)
         const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://www.tiktok.com/@${username}`);
         const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error('Network blocked');
+        if (!response.ok) throw new Error('Network error - try again');
         const html = await response.text();
 
-        const jsonMatch = html.match(/window\[['"]__UNIVERSAL_DATA_FOR_REHYDRATION__['"]\]\s*=\s*({.+?});/s) ||
-                          html.match(/<script id="__SIGI_STATE__"[^>]*>({.+?})<\/script>/s);
+        // Fallback regex for 2025 TikTok JSON (from Scrapfly/Decodo guides)
+        let jsonMatch = html.match(/<script id="__SIGI_STATE__" type="application\/json">({.*?})<\/script>/s);
+        if (!jsonMatch) jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});/s);
+        if (!jsonMatch) jsonMatch = html.match(/window\.__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*({.*?});/s);
         if (!jsonMatch) throw new Error('Profile data not found (private or invalid user)');
 
         const data = JSON.parse(jsonMatch[1]);
-        const userDetail = data.__DEFAULT_SCOPE__?.webapp?.['user-detail'] || {};
-        const user = userDetail.userInfo?.user || {};
-        const posts = userDetail['user-post']?.itemList || data.__DEFAULT_SCOPE__?.webapp?.['user-post']?.itemList || [];
 
-        if (!posts.length) throw new Error('No public videos');
+        // 2025 nested path (from Decodo tutorial)
+        const userDetail = data.__DEFAULT_SCOPE__?.webapp?.['user-detail'] || data.UserModule?.data || {};
+        const user = userDetail.userInfo?.user || userDetail.user || {};
+        const posts = userDetail['user-post']?.itemList || data.UserModule?.data?.videos || data.__DEFAULT_SCOPE__?.webapp?.['user-post']?.itemList || [];
 
+        if (posts.length === 0) {
+          results.innerHTML = '<div class="error">No public videos found or profile is private. Try another username.</div>';
+          return;
+        }
+
+        // Profile header
         let output = `<div class="profile-header">
           <h2>${user.nickname || username} (@${username})</h2>
-          <p>Followers: ${(user.followerCount||0).toLocaleString()} • Likes: ${(user.heart||0).toLocaleString()}</p>
+          <p>Followers: ${(user.followerCount || 0).toLocaleString()} | Likes: ${(user.heart || user.totalFavorited || 0).toLocaleString()} | Videos: ${posts.length}</p>
+          <p style="color: #666; font-style: italic;">Bio: ${user.signature || user.bio || 'No bio available'}</p>
         </div>`;
 
-        posts.slice(0,12).forEach(p => {
-          const v = p.video || {};
-          const play = v.playAddr?.[0] || v.downloadAddr?.[0] || '';
-          const cover = v.cover?.[0] || '';
-          const desc = (p.desc||'').slice(0,120);
-          const dl = play.replace(/playwm/gi,'play');
-          if (play) {
+        // Video grid (first 12)
+        posts.slice(0, 12).forEach(post => {
+          const video = post.video || post.itemInfo?.itemStruct?.video || {};
+          const playUrl = video.playAddr?.[0] || video.downloadAddr?.[0] || '';
+          const cover = video.cover?.[0] || video.dynamicCover?.[0] || '';
+          const desc = (post.desc || post.text || 'No description').slice(0, 100);
+          const downloadUrl = playUrl.replace(/playwm/gi, 'play'); // No watermark
+
+          if (playUrl) {
             output += `<div class="video-item">
-              <video controls preload="metadata" poster="${cover}"><source src="${play}" type="video/mp4"></video>
-              <p class="desc">${desc}</p>
-              <a href="${dl}" download class="download">Download No Watermark</a>
+              <video controls preload="metadata" poster="${cover}">
+                <source src="${playUrl}" type="video/mp4">
+              </video>
+              <p class="desc">${desc}${ (post.desc || post.text || '').length > 100 ? '...' : '' }</p>
+              <a href="${downloadUrl}" download class="download">Download HD (No Watermark)</a>
             </div>`;
           }
         });
 
         results.innerHTML = output;
 
-      } catch (e) {
-        results.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+      } catch (error) {
+        results.innerHTML = `<div class="error">Error loading profile: ${error.message}<br><br>Try again in a minute or use a VPN if it persists.</div>`;
       }
     }
   </script>
