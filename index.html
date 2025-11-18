@@ -42,13 +42,13 @@
       const results = document.getElementById('results');
       results.innerHTML = '<div class="loading">Loading profile and videos...</div>';
       try {
-        // Proxy for raw HTML (from Apify/Scrapfly guides)
+        // Use a reliable 2025 proxy for raw HTML
         const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(`https://www.tiktok.com/@${username}`);
         const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error('Network error - try again');
         const html = await response.text();
 
-        // 2025 regex for script tag (from Decodo/Scrapfly)
+        // Updated 2025 regex for JSON blob (from Scrapfly/Decodo guides)
         let jsonMatch = html.match(/<script id="__SIGI_STATE__" type="application\/json">({.*?})<\/script>/s);
         if (!jsonMatch) jsonMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});/s);
         if (!jsonMatch) jsonMatch = html.match(/window\.__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*({.*?});/s);
@@ -56,7 +56,7 @@
 
         const data = JSON.parse(jsonMatch[1]);
 
-        // 2025 path with fallbacks (from Aimultiple/Apify)
+        // 2025 nested path with fallbacks (from Aimultiple/Apify)
         const userDetail = data.__DEFAULT_SCOPE__?.webapp?.['user-detail'] || data.UserModule?.data || {};
         const user = userDetail.userInfo?.user || userDetail.user || {};
         const posts = userDetail['user-post']?.itemList || data.UserModule?.data?.videos || data.__DEFAULT_SCOPE__?.webapp?.['user-post']?.itemList || [];
@@ -68,7 +68,7 @@
 
         // Profile header
         let output = `<div class="profile-header">
-          <h2>${user.nickname || username} (@${username})</h2>
+          <h2>$$ {user.nickname || username} (@ $${username})</h2>
           <p>Followers: ${(user.followerCount || 0).toLocaleString()} | Likes: ${(user.heart || user.totalFavorited || 0).toLocaleString()} | Videos: ${posts.length}</p>
           <p style="color: #666; font-style: italic;">Bio: ${user.signature || user.bio || 'No bio available'}</p>
         </div>`;
@@ -86,7 +86,7 @@
               <video controls preload="metadata" poster="${cover}">
                 <source src="${playUrl}" type="video/mp4">
               </video>
-              <p class="desc">${desc}${ (post.desc || post.text || '').length > 100 ? '...' : '' }</p>
+              <p class="desc">$$ {desc} $${ (post.desc || post.text || '').length > 100 ? '...' : '' }</p>
               <a href="${downloadUrl}" download class="download">Download HD (No Watermark)</a>
             </div>`;
           }
@@ -100,4 +100,3 @@
     }
   </script>
 </body>
-</html>
